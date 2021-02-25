@@ -4,18 +4,52 @@ on:
   push:
     branches: [master]
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout GitHub Action
-        uses: actions/checkout@master
+env:
+  # Enable if you have private registry and store creds in github secret
+  # For more info: https://docs.github.com/en/actions/reference/encrypted-secrets
+  # DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  # DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  # DOCKER_REGISTRY_SERVER: ${{ secrets.DOCKER_REGISTRY_SERVER }}
+  # APP_NAME: ${{ secrets.APP_NAME }}
+  IMAGE_TAG: ${{ github.sha }}
 
+jobs:
+  lint-and-test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [14.x]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@master
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
       - name: Install packages
         run: npm ci
-
       - name: Lint
         run: npm run lint
-
       - name: Test
         run: npm test
+
+  build-and-deploy:
+    name: Build and Deploy
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@master
+      # - name: Container Registry Login
+      #   run: echo ${{ env.DOCKER_PASSWORD }} | docker login --username=${{ env.DOCKER_USERNAME }} ${{ env.DOCKER_REGISTRY_SERVER }} --password-stdin
+      # - name: Build Docker Image
+      #   run: docker build . -t ${{ env.DOCKER_REGISTRY_SERVER }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAG }}
+      - name: Build Docker Image
+        run: docker build .
+      # - name: Push image to registry
+      #   run: HEROKU_API_KEY=${{ env.DOCKER_PASSWORD }} heroku container:push web --app ${{ env.APP_NAME }}
+      # - name: Set environment variables
+      #   run: HEROKU_API_KEY=${{ env.DOCKER_PASSWORD }} heroku config:set CRYPTO_ROUNDS="${{ env.CRYPTO_ROUNDS }}" JWT_ALGORITHM="${{ env.JWT_ALGORITHM }}" JWT_EXPIRES_IN="${{ env.JWT_EXPIRES_IN }}" JWT_ACCESS_TOKEN_SECRET="${{ env.JWT_ACCESS_TOKEN_SECRET }}" JWT_REFRESH_TOKEN_SECRET="${{ env.JWT_REFRESH_TOKEN_SECRET }}" MAIL_API_KEY="${{ env.MAIL_API_KEY }}" FROM_EMAIL="${{ env.FROM_EMAIL }}" FROM_EMAIL_NAME="${{ env.FROM_EMAIL_NAME }}" MAIL_HOST="${{ env.MAIL_HOST }}" --app ${{ env.APP_NAME }}
+      # - name: Deploy to Heroku
+      #   run: HEROKU_API_KEY=${{ env.DOCKER_PASSWORD }} heroku container:release web --app ${{ env.APP_NAME }}
